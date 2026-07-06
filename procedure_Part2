@@ -1,1 +1,522 @@
+---
 
+# 🌐 Step 11: Access the Application
+
+## Option 1: Using NodePort
+
+Check the NodePort assigned to the application.
+
+```bash
+kubectl get svc -n food-app
+```
+
+Example Output
+
+```
+NAME              TYPE       CLUSTER-IP      PORT(S)
+
+food-service      NodePort   10.99.15.201   80:30993/TCP
+```
+
+Get Minikube IP
+
+```bash
+minikube ip
+```
+
+Example
+
+```
+192.168.49.2
+```
+
+Access the application
+
+```
+http://192.168.49.2:30993
+```
+
+---
+
+## Option 2: Using Port Forward (Recommended on AWS EC2)
+
+Since Minikube runs inside the EC2 instance, NodePort is not directly accessible through the EC2 public IP.
+
+Forward the service:
+
+```bash
+kubectl port-forward service/food-service 8080:80 -n food-app --address=0.0.0.0
+```
+
+Open in browser
+
+```
+http://<EC2-PUBLIC-IP>:8080
+```
+
+Example
+
+```
+http://54.xxx.xxx.xxx:8080
+```
+
+📸 Screenshot
+
+```
+screenshots/23-port-forward.png
+
+screenshots/24-browser-output.png
+```
+
+---
+
+# ✅ Verify Kubernetes Resources
+
+Check all resources.
+
+```bash
+kubectl get all -n food-app
+```
+
+Verify Pods
+
+```bash
+kubectl get pods -n food-app
+```
+
+Verify Deployments
+
+```bash
+kubectl get deployment -n food-app
+```
+
+Verify Services
+
+```bash
+kubectl get svc -n food-app
+```
+
+Verify Endpoints
+
+```bash
+kubectl get endpoints -n food-app
+```
+
+Verify Ingress
+
+```bash
+kubectl get ingress -n food-app
+```
+
+Verify HPA
+
+```bash
+kubectl get hpa -n food-app
+```
+
+Verify Network Policies
+
+```bash
+kubectl get networkpolicy -n food-app
+```
+
+---
+
+# 📈 Test Horizontal Pod Autoscaler (HPA)
+
+Generate load inside the cluster.
+
+```bash
+kubectl run load-generator \
+--rm -it \
+--image=busybox \
+-- /bin/sh
+```
+
+Inside BusyBox
+
+```bash
+while true
+do
+wget -q -O- http://food-service
+done
+```
+
+Observe scaling
+
+```bash
+kubectl get hpa -w
+```
+
+Watch pods
+
+```bash
+kubectl get pods -w
+```
+
+Expected
+
+```
+Pods
+
+2
+
+↓
+
+3
+
+↓
+
+4
+
+↓
+
+5
+```
+
+📸 Screenshot
+
+```
+screenshots/25-hpa-scaling.png
+```
+
+---
+
+# ❤️ Test Self-Healing
+
+List Pods
+
+```bash
+kubectl get pods -n food-app
+```
+
+Delete one Pod
+
+```bash
+kubectl delete pod <pod-name> -n food-app
+```
+
+Watch Pods
+
+```bash
+kubectl get pods -w
+```
+
+Expected
+
+```
+Old Pod
+
+↓
+
+Terminating
+
+↓
+
+New Pod
+
+↓
+
+Running
+```
+
+📸 Screenshot
+
+```
+screenshots/26-self-healing.png
+```
+
+---
+
+# 🔄 Rolling Update
+
+Update application image
+
+```bash
+kubectl set image deployment/cafe-website \
+cafe-website=madhu934652/cafe-website:v2 \
+-n food-app
+```
+
+Verify rollout
+
+```bash
+kubectl rollout status deployment/cafe-website -n food-app
+```
+
+Check rollout history
+
+```bash
+kubectl rollout history deployment/cafe-website -n food-app
+```
+
+📸 Screenshot
+
+```
+screenshots/27-rolling-update.png
+```
+
+---
+
+# ↩️ Rollback
+
+Rollback deployment
+
+```bash
+kubectl rollout undo deployment/cafe-website -n food-app
+```
+
+Verify
+
+```bash
+kubectl rollout status deployment/cafe-website -n food-app
+```
+
+📸 Screenshot
+
+```
+screenshots/28-rollback.png
+```
+
+---
+
+# ❌ Problems Faced and Solutions
+
+## 1. Invalid Container Name
+
+### Error
+
+```
+Invalid value: "cafe-site-Madhu"
+```
+
+### Cause
+
+Container names must contain lowercase characters only.
+
+### Solution
+
+```
+name: cafe-site-madhu
+```
+
+---
+
+## 2. ImagePullBackOff
+
+### Cause
+
+Docker image not available or incorrect image name.
+
+### Solution
+
+```bash
+docker push madhu934652/cafe-website:v1
+```
+
+Update Deployment image.
+
+---
+
+## 3. CreateContainerConfigError
+
+### Error
+
+```
+CreateContainerConfigError
+```
+
+### Root Cause
+
+Secret was missing.
+
+Describe Pod
+
+```bash
+kubectl describe pod <pod-name> -n food-app
+```
+
+Output
+
+```
+Error: secret "mysql-secret" not found
+```
+
+### Fix
+
+```bash
+kubectl apply -f k8s/04-secret.yaml
+```
+
+Restart Deployment
+
+```bash
+kubectl rollout restart deployment/mysql -n food-app
+```
+
+📸 Screenshot
+
+```
+screenshots/29-secret-error.png
+```
+
+---
+
+## 4. Service Endpoints <none>
+
+### Cause
+
+Selector mismatch.
+
+Wrong
+
+```yaml
+selector:
+
+ app: food-app
+```
+
+Correct
+
+```yaml
+selector:
+
+ app: cafe-website
+```
+
+Verify
+
+```bash
+kubectl get endpoints -n food-app
+```
+
+---
+
+## 5. Wrong Target Port
+
+Wrong
+
+```yaml
+targetPort: 8080
+```
+
+Correct
+
+```yaml
+targetPort: 80
+```
+
+---
+
+## 6. NodePort Not Accessible
+
+Cause
+
+Minikube networking inside EC2.
+
+Solution
+
+```bash
+kubectl port-forward service/food-service 8080:80 -n food-app --address=0.0.0.0
+```
+
+---
+
+# 📸 Screenshots Included
+
+- Docker Installation
+- Docker Build
+- Docker Images
+- Docker Push
+- Minikube Start
+- Kubernetes Node
+- Namespace
+- ConfigMap
+- Secret
+- PVC
+- MySQL Deployment
+- Application Deployment
+- Services
+- Endpoints
+- Ingress
+- HPA
+- Network Policy
+- Pod Running
+- Browser Output
+- Secret Error
+- CreateContainerConfigError
+- Port Forward
+- Final Working Website
+
+---
+
+# 📚 What I Learned
+
+Through this project, I gained hands-on experience with:
+
+- Docker image creation and management
+- Docker Hub image publishing
+- Kubernetes architecture
+- Namespaces
+- Deployments
+- ReplicaSets
+- Pods
+- Services (ClusterIP and NodePort)
+- ConfigMaps
+- Secrets
+- Persistent Volume Claims (PVC)
+- Ingress
+- Horizontal Pod Autoscaler (HPA)
+- Network Policies
+- Kubernetes networking
+- Labels and Selectors
+- Debugging Kubernetes deployments
+- Using `kubectl logs`
+- Using `kubectl describe`
+- Reading Kubernetes Events
+- Troubleshooting application deployment issues
+
+---
+
+# 🚀 Future Improvements
+
+- Deploy the application on Amazon EKS
+- Use Amazon ECR instead of Docker Hub
+- Implement GitHub Actions CI/CD
+- Add Jenkins pipeline
+- Configure NGINX Ingress Controller
+- Enable HTTPS using Cert Manager
+- Monitor the application using Prometheus and Grafana
+- Centralize logs using the ELK Stack
+- Deploy using Helm Charts
+- Implement GitOps with Argo CD
+
+---
+
+# 🏁 Conclusion
+
+This project demonstrates the complete lifecycle of deploying a containerized web application using Docker and Kubernetes.
+
+During the implementation, I gained practical experience in containerization, Kubernetes deployments, networking, service exposure, debugging, and troubleshooting common production-like issues.
+
+In addition to successfully deploying the application, I learned how to identify and resolve issues such as ImagePullBackOff, CreateContainerConfigError, Service selector mismatches, Secret configuration errors, and Minikube networking limitations.
+
+This project significantly strengthened my understanding of Kubernetes and prepared me for deploying production-grade applications using Amazon EKS.
+
+---
+
+# 👩‍💻 Author
+
+**Madhuri Chennupati**
+
+Cloud & DevOps Engineer
+
+GitHub: https://github.com/<your-github-username>
+
+LinkedIn: https://www.linkedin.com/in/<your-linkedin-profile>
+
+---
+
+# ⭐ If you found this project helpful
+
+Please consider giving this repository a ⭐ on GitHub.
